@@ -22,3 +22,5 @@ SIGNAL_COOLDOWN = 300  # فاصله بین دو سیگنال متوالی برا
 # --- متغیرهای صرافی (اختیاری برای حالت فقط سیگنال) ---
 API_KEY = os.getenv("BINANCE_API_KEY", "your_api_key")
 API_SECRET = os.getenv("BINANCE_API_SECRET", "your_api_secret")
+# حداکثر تعداد سیگنال مجاز در هر ساعت برای جلوگیری از اسپم
+MAX_SIGNALS_PER_HOUR = 12
