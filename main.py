@@ -29,7 +29,7 @@ class AsemanSignalBot:
         self.signal_burst_protection = {
             'count': 0,
             'window_start': time.time(),
-            'max_per_hour': config.MAX_SIGNALS_PER_HOUR or 12
+            'max_per_hour': getattr(config, 'MAX_SIGNALS_PER_HOUR', 12)
         }
     
     def calculate_signal_quality_score(self, analysis):
