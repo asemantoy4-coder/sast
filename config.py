@@ -12,9 +12,8 @@ INTERVAL = "5m"
 RISK_PERCENT = os.getenv("RISK_PERCENT", "1.0")  # درصد ریسک
 LEVERAGE = os.getenv("LEVERAGE", "10")          # اهرم
 
-# --- تنظیمات تلگرام (امن) ---
-# توجه: مقدار پیش‌فرض را خالی گذاشتم تا کد رندر از پنل بخواند
-# توکن واقعی را در پنل Render وارد کنید، نه اینجا.
+# در config.py
+# مقادیر پیش‌فرض را خالی می‌گذاریم تا فورا از Environment بخواند
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
