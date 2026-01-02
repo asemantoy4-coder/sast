@@ -5,6 +5,7 @@ import utils
 import traceback
 
 app = Flask(__name__)
+# پورت را از متغیر محیط Render می‌گیرد، اگر نبود پیش‌فرض 5000 است
 port = int(os.environ.get("PORT", 5000))
 
 # ==================== HELPER FUNCTIONS ====================
