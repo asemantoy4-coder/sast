@@ -1,10 +1,18 @@
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # اضافه شده برای حل مشکل اتصال وب
 import exchange_handler
 import utils
 import traceback
 
 app = Flask(__name__)
+
+# ==========================================
+# فعال‌سازی CORS (اجازه دسترسی از هر وب‌سایتی)
+# این خط باعث می‌شود کد جاوا اسکریپت بتواند به این API وصل شود
+CORS(app)
+# ==========================================
+
 # پورت را از متغیر محیط Render می‌گیرد، اگر نبود پیش‌فرض 5000 است
 port = int(os.environ.get("PORT", 5000))
 
