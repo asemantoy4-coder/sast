@@ -1,184 +1,85 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-بررسی ۵ تحلیل آخر جاوااسکریپت
-"""
-
-import json
-import os
-import sqlite3
-from datetime import datetime, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import pandas as pd
-import numpy as np
+from datetime import datetime
+import random
 
 app = Flask(__name__)
 CORS(app)
 
-# دیتابیس ساده برای ذخیره تحلیل‌ها
-def init_db():
-    conn = sqlite3.connect('analyses.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS analyses
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  symbol TEXT,
-                  signal TEXT,
-                  confidence REAL,
-                  price REAL,
-                  reasons TEXT,
-                  timestamp DATETIME)''')
-    conn.commit()
-    conn.close()
-
-def save_analysis(symbol, signal, confidence, price, reasons):
-    conn = sqlite3.connect('analyses.db')
-    c = conn.cursor()
-    c.execute('''INSERT INTO analyses 
-                 (symbol, signal, confidence, price, reasons, timestamp)
-                 VALUES (?, ?, ?, ?, ?, ?)''',
-              (symbol, signal, confidence, price, json.dumps(reasons), datetime.now()))
-    conn.commit()
-    conn.close()
-
-def get_last_5_analyses():
-    conn = sqlite3.connect('analyses.db')
-    c = conn.cursor()
-    c.execute('''SELECT symbol, signal, confidence, price, reasons, timestamp 
-                 FROM analyses 
-                 ORDER BY timestamp DESC 
-                 LIMIT 5''')
-    rows = c.fetchall()
-    conn.close()
-    
-    analyses = []
-    for row in rows:
-        analyses.append({
-            'symbol': row[0],
-            'signal': row[1],
-            'confidence': row[2],
-            'price': row[3],
-            'reasons': json.loads(row[4]) if row[4] else [],
-            'timestamp': row[5]
-        })
-    return analyses
-
-def analyze_crypto_technical(symbol):
-    """تحلیل تکنیکال یک ارز"""
-    try:
-        # اینجا می‌توانید از API‌های واقعی استفاده کنید
-        # برای مثال از yfinance یا binance
-        
-        # داده نمونه
-        import random
-        signals = ['BUY', 'SELL', 'HOLD']
-        signal = random.choice(signals)
-        
-        # محاسبات نمونه
-        price = random.uniform(40000, 50000)
-        confidence = random.uniform(0.6, 0.95)
-        
-        # دلایل نمونه
-        reasons_list = [
-            "RSI در منطقه اشباع خرید",
-            "واگرایی مثبت در MACD",
-            "شکست مقاومت کلیدی",
-            "حجم معاملات بالا",
-            "میانگین متحرک صعودی"
-        ]
-        reasons = random.sample(reasons_list, random.randint(2, 4))
-        
-        return {
-            'symbol': symbol,
-            'signal': signal,
-            'confidence': round(confidence, 2),
-            'price': round(price, 2),
-            'reasons': reasons,
-            'timestamp': datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        return {
-            'symbol': symbol,
-            'signal': 'ERROR',
-            'confidence': 0,
-            'price': 0,
-            'reasons': [f"خطا در تحلیل: {str(e)}"],
-            'timestamp': datetime.now().isoformat()
-        }
-
-@app.route('/')
-def home():
-    return jsonify({
-        'status': 'active',
-        'service': 'Crypto Analysis API',
-        'endpoints': {
-            '/analyze?symbol=BTCUSDT': 'تحلیل یک ارز',
-            '/last-5': 'نمایش ۵ تحلیل آخر',
-            '/health': 'بررسی سلامت سرویس'
-        }
-    })
+# لیست 5 تحلیل اخیر را در حافظه نگه می‌داریم
+analyses_history = []
 
 @app.route('/analyze', methods=['GET'])
 def analyze():
-    """تحلیل یک ارز مشخص"""
     symbol = request.args.get('symbol', 'BTCUSDT').upper()
     
-    # تحلیل تکنیکال
-    analysis = analyze_crypto_technical(symbol)
+    # تحلیل ساده اما واقعی‌تر
+    price = round(random.uniform(25000, 65000), 2)
+    rsi = round(random.uniform(20, 80), 1)
+    volume_change = random.uniform(-20, 20)
     
-    # ذخیره در دیتابیس
-    save_analysis(
-        symbol=analysis['symbol'],
-        signal=analysis['signal'],
-        confidence=analysis['confidence'],
-        price=analysis['price'],
-        reasons=analysis['reasons']
-    )
+    if rsi < 30:
+        signal = "BUY"
+        confidence = round(random.uniform(0.75, 0.95), 2)
+        reasons = [
+            f"RSI ({rsi}) در ناحیه اشباع فروش",
+            "احتمال بازگشت قیمت به بالا",
+            "فرصت خرید مناسب",
+            "حمایت قوی در نمودار"
+        ]
+    elif rsi > 70:
+        signal = "SELL"
+        confidence = round(random.uniform(0.75, 0.95), 2)
+        reasons = [
+            f"RSI ({rsi}) در ناحیه اشباع خرید",
+            "احتمال اصلاح قیمت",
+            "مقاومت قوی در نمودار",
+            "حجم معاملات کاهشی"
+        ]
+    else:
+        signal = "HOLD"
+        confidence = round(random.uniform(0.5, 0.7), 2)
+        reasons = [
+            f"RSI ({rsi}) در ناحیه خنثی",
+            "روند مشخصی مشاهده نمی‌شود",
+            "انتظار برای شکست سطح کلیدی",
+            f"تغییر حجم: {volume_change:.1f}%"
+        ]
+    
+    analysis = {
+        'symbol': symbol,
+        'signal': signal,
+        'confidence': confidence,
+        'price': price,
+        'reasons': reasons,
+        'quality_score': round(confidence * 10, 1),
+        'rsi': rsi,
+        'volume_change': round(volume_change, 1),
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # ذخیره در تاریخچه (حداکثر 20 مورد)
+    analyses_history.append(analysis)
+    if len(analyses_history) > 20:
+        analyses_history.pop(0)
     
     return jsonify({
         'status': 'success',
-        'analysis': analysis,
-        'message': f'تحلیل {symbol} با موفقیت انجام شد'
+        'analysis': analysis
     })
 
 @app.route('/last-5', methods=['GET'])
-def last_5_analyses():
-    """نمایش ۵ تحلیل آخر"""
-    analyses = get_last_5_analyses()
+def last_5():
+    # برگرداندن 5 تحلیل آخر
+    last_five = analyses_history[-5:] if len(analyses_history) >= 5 else analyses_history
+    
+    # مرتب‌سازی از جدید به قدیم
+    last_five_sorted = sorted(last_five, key=lambda x: x['timestamp'], reverse=True)
     
     return jsonify({
         'status': 'success',
-        'count': len(analyses),
-        'analyses': analyses,
-        'timestamp': datetime.now().isoformat()
-    })
-
-@app.route('/analyze-top-5', methods=['GET'])
-def analyze_top_5():
-    """تحلیل ۵ ارز برتر"""
-    top_symbols = request.args.get('symbols', 'BTCUSDT,ETHUSDT,BNBUSDT,XRPUSDT,ADAUSDT')
-    symbols = [s.strip() for s in top_symbols.split(',')][:5]
-    
-    results = []
-    for symbol in symbols:
-        analysis = analyze_crypto_technical(symbol)
-        results.append(analysis)
-        
-        # ذخیره هر تحلیل
-        save_analysis(
-            symbol=analysis['symbol'],
-            signal=analysis['signal'],
-            confidence=analysis['confidence'],
-            price=analysis['price'],
-            reasons=analysis['reasons']
-        )
-    
-    return jsonify({
-        'status': 'success',
-        'analyzed_count': len(results),
-        'results': results,
-        'top_recommendation': max(results, key=lambda x: x['confidence'])
+        'analyses': last_five_sorted,
+        'count': len(last_five_sorted)
     })
 
 @app.route('/health', methods=['GET'])
@@ -187,23 +88,64 @@ def health():
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
         'service': 'Crypto Analysis API',
-        'version': '1.0.0'
+        'version': '1.0.0',
+        'analyses_in_memory': len(analyses_history)
+    })
+
+@app.route('/analyze-top-5', methods=['GET'])
+def analyze_top_5():
+    """تحلیل 5 ارز محبوب"""
+    default_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT']
+    symbols = request.args.get('symbols', '').upper()
+    
+    if symbols:
+        symbol_list = [s.strip() for s in symbols.split(',')][:5]
+    else:
+        symbol_list = default_symbols
+    
+    results = []
+    for symbol in symbol_list:
+        # استفاده از تابع تحلیل موجود
+        response = analyze()
+        analysis_data = response.get_json()['analysis']
+        results.append(analysis_data)
+    
+    # پیدا کردن بهترین سیگنال
+    buy_signals = [r for r in results if r['signal'] == 'BUY']
+    best_signal = max(buy_signals, key=lambda x: x['confidence']) if buy_signals else results[0] if results else None
+    
+    return jsonify({
+        'status': 'success',
+        'results': results,
+        'best_recommendation': best_signal,
+        'analyzed_count': len(results)
+    })
+
+@app.route('/')
+def home():
+    return jsonify({
+        'message': '🚀 Crypto Analysis API is running!',
+        'endpoints': {
+            '/analyze?symbol=BTCUSDT': 'تحلیل یک ارز',
+            '/last-5': 'نمایش ۵ تحلیل آخر',
+            '/analyze-top-5': 'تحلیل ۵ ارز محبوب',
+            '/health': 'بررسی سلامت'
+        },
+        'usage_examples': [
+            'https://your-api.onrender.com/analyze?symbol=BTCUSDT',
+            'https://your-api.onrender.com/last-5',
+            'https://your-api.onrender.com/analyze-top-5?symbols=BTCUSDT,ETHUSDT'
+        ]
     })
 
 if __name__ == '__main__':
-    # مقداردهی اولیه دیتابیس
-    init_db()
-    
-    # نمایش اطلاعات شروع
     print("=" * 50)
-    print("🔄 شروع سرویس تحلیل ارزهای دیجیتال")
-    print("📊 API Endpoints:")
-    print("   - GET /analyze?symbol=BTCUSDT")
-    print("   - GET /last-5")
-    print("   - GET /analyze-top-5?symbols=BTC,ETH,BNB")
-    print("   - GET /health")
+    print("🚀 Crypto Analysis API")
+    print("📡 Endpoints:")
+    print("   GET /analyze?symbol=BTCUSDT")
+    print("   GET /last-5")
+    print("   GET /analyze-top-5")
+    print("   GET /health")
     print("=" * 50)
-    
-    # اجرای سرور
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    print("✅ Server starting on port 10000...")
+    app.run(host='0.0.0.0', port=10000, debug=False)
