@@ -3,7 +3,7 @@ import requests
 import time
 
 class DataHandler:
-    """کلاس مدیریت دریافت داده از صرافی (نسخه دیباگ)"""
+    """کلاس مدیریت دریافت داده از صرافی (نسخه پایدار با User-Agent)"""
 
     @staticmethod
     def fetch_data(symbol: str, timeframe: str, limit: int = 100) -> pd.DataFrame:
@@ -11,7 +11,7 @@ class DataHandler:
         دریافت کندل‌های OHLCV از API بیننس (Public)
         """
         try:
-            # تبدیل نماد به فرمت بیننس (مثال BTC/USDT -> BTCUSDT)
+            # تبدیل نماد به فرمت بیننس
             binance_symbol = symbol.replace("/", "")
             print(f"🔍 [Handler] Fetching data for {binance_symbol}...")
             
@@ -22,7 +22,12 @@ class DataHandler:
                 "limit": limit
             }
             
-            response = requests.get(url, params=params, timeout=10)
+            # افزودن هدرهای استاندارد مرورگر برای جلوگیری از خطای 418
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=15)
             
             # بررسی کد وضعیت (200 یعنی موفق)
             if response.status_code == 200:
@@ -43,15 +48,20 @@ class DataHandler:
                 numeric_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
                 df[numeric_cols] = df[numeric_cols].astype(float)
                 
-                # حذف ستون‌های اضافه و نگهداری ستون‌های لازم برای utils.py
+                # حذف ستون‌های اضافه و نگهداری ستون‌های لازم
                 df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
                 
-                print(f"✅ [Handler] Data received successfully for {binance_symbol} (Len: {len(df)})")
+                print(f"✅ [Handler] Data received for {binance_symbol} (Len: {len(df)})")
                 return df
                 
             else:
-                # اینجا را دقیق ببینید: چه کدی می‌دهد؟ (418 یا 404؟)
-                print(f"⚠️ [Handler] Binance API Error {response.status_code}: {response.text}")
+                # مدیریت خطاهای رایج بیننس (418, 429)
+                if response.status_code == 418:
+                    print(f"⚠️ [Handler] Binance IP Ban (418) for {binance_symbol}")
+                elif response.status_code == 429:
+                    print(f"⚠️ [Handler] Rate Limit (429) for {binance_symbol}")
+                else:
+                    print(f"⚠️ [Handler] Binance Error {response.status_code}: {response.text}")
                 return pd.DataFrame()
             
         except requests.exceptions.Timeout:
