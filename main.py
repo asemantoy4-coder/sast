@@ -1,157 +1,90 @@
-# Force Rebuild for Requirements
-import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS  # اضافه شده برای حل مشکل اتصال وب
-import exchange_handler
-import utils
-import traceback
-
-app = Flask(__name__)
-
-# ==========================================
-# فعال‌سازی CORS (اجازه دسترسی از هر وب‌سایتی)
-# این خط باعث می‌شود کد جاوا اسکریپت بتواند به این API وصل شود
-CORS(app)
-# ==========================================
-
-# پورت را از متغیر محیط Render می‌گیرد، اگر نبود پیش‌فرض 5000 است
-port = int(os.environ.get("PORT", 5000))
-
-# ==================== HELPER FUNCTIONS ====================
-# این توابع منطق‌های هوشمند قبلی را دارند اما بدون نیاز به کلاس اجرا می‌شوند
-
-def check_multi_timeframe_alignment(symbol):
-    """
-    بررسی هماهنگی سیگنال در تایم‌فریم‌های مختلف (15m, 1h)
-    """
-    timeframes = ['15m', '1h']
-    aligned_count = 0
+// مرحله ۲: تحلیل ۵ ارز برتر با پایتون (API واقعی)
+async function processTopFiveAI() {
+    updateScanStatus("مرحله ۲: تحلیل ۵ ارز برتر با پایتون", 50);
     
-    for tf in timeframes:
-        try:
-            # دریافت دیتا برای تایم‌فریم بالاتر
-            df_tf = exchange_handler.DataHandler.fetch_data(symbol, tf, limit=50)
-            if not df_tf.empty and len(df_tf) > 20:
-                analysis_tf = utils.generate_scalp_signals(df_tf)
-                score_tf = analysis_tf.get('score', 0)
-                if abs(score_tf) >= 2.0: 
-                    aligned_count += 1
-        except Exception as e:
-            continue
-    
-    # اگر حداقل 1 تایم‌فریم بالاتر همسو بود
-    return aligned_count >= 1
+    // مرتب‌سازی بر اساس بیشترین امتیاز
+    const top5 = [...cryptoScanResults]
+        .sort((a, b) => b.preliminaryScore - a.preliminaryScore)
+        .slice(0, 5);
 
-def calculate_signal_quality_score(analysis, symbol):
-    """
-    محاسبه نهایی کیفیت سیگنال
-    """
-    score_weights = {
-        'base_score': 0.4,
-        'volume_confirmation': 0.2,
-        'multi_timeframe_alignment': 0.15,
-        'risk_reward_ratio': 0.15,
-        'market_context': 0.1
+    selectedTopSymbols = top5.map(s => s.symbol);
+    
+    // علامت‌گذاری کاندیدهای AI
+    selectedTopSymbols.forEach(symbol => {
+        const index = cryptoScanResults.findIndex(c => c.symbol === symbol);
+        if (index !== -1) {
+            cryptoScanResults[index].isTopCandidate = true;
+        }
+    });
+    
+    document.getElementById('aiCount').textContent = selectedTopSymbols.length;
+    
+    // نمایش در باکس AI
+    const aiContent = document.getElementById('aiContent');
+    aiContent.innerHTML = `
+        <div style="color: var(--success); margin-bottom: 10px; font-weight: bold;">✅ ۵ کاندیدای نهایی شناسایی شدند:</div>
+        <div style="display: flex; flex-wrap: wrap; gap:5px; margin-bottom: 10px;">
+            ${selectedTopSymbols.map(s => `<span class="target-badge" style="background: rgba(240, 185, 11, 0.2); color: var(--accent);">${s}</span>`).join('')}
+        </div>
+        <div style="margin-top: 10px; font-size: 12px; color: #aaa;">در حال تحلیل عمیق با AI (پایتون)...</div>
+    `;
+    
+    // تحلیل هر یک از ۵ ارز برتر با AI
+    for (let i = 0; i < top5.length; i++) {
+        if (!isCryptoScanning) break;
+        
+        const symbolData = top5[i];
+        
+        try {
+            // تحلیل AI
+            const response = await fetch(`${PYTHON_API_URL}?symbol=${symbolData.symbol}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status}`);
+            }
+
+            const pythonAnalysis = await response.json();
+            
+            // چک کردن اینکه آیا پاسخ موفقیت‌آمیز است
+            if (pythonAnalysis.status !== 'success') {
+                throw new Error(pythonAnalysis.message || "Unknown Python Error");
+            }
+
+            topAISignals.push({
+                symbol: symbolData.symbol,
+                price: pythonAnalysis.price,
+                signal: pythonAnalysis.signal,
+                confidence: pythonAnalysis.confidence, // این باید عدد باشد (0.7 یا 0.8)
+                reasons: pythonAnalysis.reasons,
+                riskReward: `Quality: ${pythonAnalysis.quality_score}`, // استفاده از quality_score
+                analyzedByAI: true,
+                aiTimestamp: new Date().getTime()
+            });
+            
+            // به‌روزرسانی پیشرفت
+            const progress = 50 + Math.round(((i + 1) / top5.length) * 50);
+            updateScanStatus(`تحلیل AI: ${i + 1}/${top5.length}`, progress);
+            
+            // نمایش نتایج AI
+            displayAISignals();
+            
+            await sleep(1000);
+            
+        } catch (error) {
+            console.error(`خطا در تحلیل پایتون برای ${symbolData.symbol}:`, error);
+            // اگر خطا از سرور بود، می‌توان اینجا تصمیم گرفت که از تحلیل داخلی استفاده کند
+            // برای سادگی فعلا خطا را لوگ می‌کنیم
+            showNotification(`خطا در تحلیل ${symbolData.symbol}: ${error.message}`, "error");
+        }
     }
     
-    quality_score = analysis.get('score', 0) * score_weights['base_score']
-    
-    inner = analysis.get('analysis', {})
-    volume_profile = inner.get('volume_profile', {})
-    
-    # 1. تأیید حجم
-    if volume_profile.get('in_value_area', False):
-        quality_score += 2 * score_weights['volume_confirmation']
-    
-    # 2. هماهنگی چند تایم‌فریم
-    # فقط یک بار برای ارزیابی کیفیت بررسی می‌کنیم
-    if check_multi_timeframe_alignment(symbol):
-        quality_score += 1.5 * score_weights['multi_timeframe_alignment']
-    
-    # 3. نسبت ریسک به ریوارد
-    current_price = analysis.get('price', 0)
-    if current_price > 0:
-        market_regime = inner.get('market_regime', {})
-        atr = market_regime.get('atr_percent', 1.0)
+    // ارسال لیدر برای تحلیل دستی
+    if (selectedTopSymbols.length > 0) {
+        document.getElementById('symbolInput').value = selectedTopSymbols[0];
+        showNotification(`ارز برتر: ${selectedTopSymbols[0]} برای تحلیل انتخاب شد`, "info");
         
-        if 0.3 <= atr <= 1.5: 
-            quality_score += 2 * score_weights['risk_reward_ratio']
-        elif atr > 2.0:
-            quality_score -= 1
-    
-    # 4. شرایط بازار
-    market_regime = inner.get('market_regime', {})
-    if market_regime.get('scalp_safe', False):
-        quality_score += 1 * score_weights['market_context']
-    
-    return min(10, max(0, quality_score))
-
-
-# ==================== FLASK ROUTES ====================
-
-@app.route('/', methods=['GET'])
-def health_check():
-    """برای نگه‌داشتن سرویس بیدار (Ping)"""
-    return jsonify({
-        "status": "online",
-        "service": "Aseman Calculation Engine",
-        "version": "API_v1.0"
-    })
-
-@app.route('/analyze', methods=['GET'])
-def analyze_coin():
-    """
-    اندپوینت اصلی.
-    ورودی: symbol (مثال BTC/USDT)
-    خروجی: JSON حاوی امتیاز، سیگنال و تحلیل‌ها
-    """
-    try:
-        symbol = request.args.get('symbol')
-        
-        if not symbol:
-            return jsonify({
-                "status": "error",
-                "message": "Missing parameter 'symbol'. Example: ?symbol=BTC/USDT"
-            }), 400
-        
-        print(f"📩 [API] Analyzing {symbol}...")
-        
-        # 1. دریافت داده اصلی (5 دقیقه)
-        df = exchange_handler.DataHandler.fetch_data(symbol, '5m', limit=100)
-        
-        if df.empty or len(df) < 20:
-            return jsonify({
-                "status": "error",
-                "message": "Insufficient data"
-            }), 404
-        
-        # 2. تحلیل اصلی
-        analysis = utils.generate_scalp_signals(df)
-        
-        # 3. محاسبه کیفیت نهایی با تابع کمکی
-        quality_score = calculate_signal_quality_score(analysis, symbol)
-        
-        # 4. ارسال پاسخ به جاوا
-        return jsonify({
-            "status": "success",
-            "symbol": symbol,
-            "price": analysis.get('price'),
-            "score": analysis.get('score'),
-            "signal": analysis.get('signal'),
-            "quality_score": float(quality_score), # امتیاز کیفیتی محاسبه شده
-            "confidence": analysis.get('confidence'),
-            "reasons": analysis.get('reasons'),
-            "analysis": analysis.get('analysis')
-        })
-        
-    except Exception as e:
-        print(f"❌ [API] Error: {e}")
-        traceback.print_exc()
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-
-if __name__ == "__main__":
-    print(f"🚀 Starting API Server on port {port}...")
-    app.run(host='0.0.0.0', port=port)
+        setTimeout(() => {
+            requestAnalysis();
+        },1000);
+    }
+}
