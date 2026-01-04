@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 # ==================== TELEGRAM NOTIFICATION ====================
 def send_telegram_notification(message, signal_type="INFO"):
-    """ارسال پیام با سیستم عیب‌یابی دقیق"""
-    token = config.TELEGRAM_BOT_TOKEN
-    chat_id = config.TELEGRAM_CHAT_ID
+    # حذف هرگونه فاصله یا کاراکتر اضافی از ابتدا و انتهای توکن و آیدی
+    token = str(config.TELEGRAM_BOT_TOKEN).strip().replace(" ", "")
+    chat_id = str(config.TELEGRAM_CHAT_ID).strip().replace(" ", "")
     
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
@@ -32,16 +32,18 @@ def send_telegram_notification(message, signal_type="INFO"):
     }
     
     try:
+        # لاگ برای دیباگ (اختیاری)
+        print(f"📡 Attempting to send message to {chat_id}...")
+        
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
-            print(f"✅ Telegram: Message sent to {chat_id}")
+            print("✅ Telegram: Message sent successfully!")
             return True
         else:
-            # این خط بسیار حیاتی است؛ دلیل شکست را در لاگ رندر چاپ می‌کند
-            print(f"❌ Telegram Error: Status {response.status_code}, Response: {response.text}")
+            print(f"❌ Telegram Error: {response.status_code} - {response.text}")
             return False
     except Exception as e:
-        print(f"🔥 Telegram Connection Failed: {e}")
+        print(f"🔥 Telegram Connection Exception: {e}")
         return False
         
         # تنظیم ایموجی
