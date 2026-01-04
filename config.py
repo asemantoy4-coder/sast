@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- تنظیمات بازار ---
-SYMBOL = os.getenv("SYMBOL", "BTC/USDT")
+WATCHLIST_STR = os.getenv("WATCHLIST", "ETHUSDT,ENAUSDT,1INCHUSDT,UNIUSDT,XRPUSDT")
+WATCHLIST = [s.strip() for s in WATCHLIST_STR.split(",")]
 INTERVAL = "5m"
 
 # --- تنظیمات ریسک ---
