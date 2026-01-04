@@ -24,7 +24,7 @@ SYSTEM_START_TIME = datetime.now(pytz.timezone('Asia/Tehran'))
 # تنظیمات سیستم
 class SystemConfig:
     CHECK_INTERVAL = 20  # ثانیه
-    MIN_SCORE = 4  # حداقل امتیاز برای سیگنال
+    MIN_SCORE = 3  # حداقل امتیاز برای سیگنال
     TRADING_HOURS = (10, 19)  # ساعت ۱۰ تا ۱۹
     MAX_HISTORY = 100  # حداکثر تاریخچه ذخیره‌شده
     RISK_FREE_ENABLED = True  # فعال‌سازی حالت ریسک‌فری
