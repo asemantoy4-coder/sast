@@ -29,7 +29,7 @@ def analyze_and_broadcast(symbol):
         score = analysis.get('score', 0)
         
         # اگر امتیاز کافی بود پیام بفرست
-        if abs(score) >= 4:
+        if abs(score) >= 0:
             side = "BUY" if score > 0 else "SELL"
             current_price = analysis['price']
             sl = current_price * 0.995 if score > 0 else current_price * 1.005
