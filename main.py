@@ -35,7 +35,7 @@ def analyze_and_broadcast(symbol):
         score = analysis.get('score', 0)
         
         # --- بخش تست: شرط روی 0 تنظیم شده تا پیام حتما ارسال شود ---
-        if abs(score) >= 0:
+        if abs(score) >= 4:
             side = "BUY" if score >= 0 else "SELL"
             current_price = analysis['price']
             
