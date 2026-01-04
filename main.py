@@ -125,37 +125,63 @@ def home():
     })
 @app.route('/force_analyze')
 def force_analyze():
-    # اگر واچ‌لیست خالی بود، از لیست دستی استفاده کن
-    current_watchlist = config.WATCHLIST if config.WATCHLIST else ["ETH/USDT", "BTC/USDT"]
+    # ۱. دریافت مستقیم و تمیز کردن واچ‌لیست از محیط سیستم یا کانفیگ
+    raw_watchlist = os.getenv("WATCHLIST", "")
+    if not raw_watchlist and hasattr(config, 'WATCHLIST'):
+        # اگر در env نبود، از فایل config بخوان
+        if isinstance(config.WATCHLIST, list):
+            current_watchlist = config.WATCHLIST
+        else:
+            raw_watchlist = str(config.WATCHLIST)
     
-    print(f"⚡ Manual Trigger: Checking {current_watchlist}")
+    # تبدیل متن به لیست و حذف فاصله‌ها و کاراکترهای اضافه
+    if raw_watchlist:
+        current_watchlist = [s.strip().replace('"', '').replace("'", "") for s in raw_watchlist.split(",")]
+    else:
+        current_watchlist = ["ETHUSDT", "BTCUSDT"] # لیست رزرو نهایی
+
+    print(f"🚀 Started force_analyze with: {current_watchlist}")
     results = []
     
-    for symbol in current_watchlist[:3]: # بررسی ۳ ارز اول
+    for symbol in current_watchlist:
         try:
-            # پاک‌سازی نام سمبل برای اطمینان
-            clean_symbol = symbol.replace("/", "") 
-            print(f"🔍 Analyzing {clean_symbol}...")
+            # حذف اسلش برای هماهنگی با API بایننس
+            clean_symbol = symbol.replace("/", "").upper()
             
+            # ۲. دریافت دیتا
             df = exchange_handler.DataHandler.fetch_data(clean_symbol, '5m', limit=100)
             
             if df is None or df.empty:
-                print(f"❌ No data for {clean_symbol}")
+                print(f"⚠️ No data for {clean_symbol}")
+                results.append({"symbol": clean_symbol, "status": "no_data"})
                 continue
                 
+            # ۳. تحلیل و تولید سیگنال
             analysis = utils.generate_scalp_signals(df, test_mode=True)
             
-            # ارسال به تلگرام
-            msg = f"🧪 *TEST*\n🪙 Symbol: {clean_symbol}\n💰 Price: {analysis['price']}\n📊 Signal: {analysis['signal']}"
+            # ۴. ارسال به تلگرام
+            msg = f"🧪 *PRO TEST*\n🪙 Symbol: {clean_symbol}\n💰 Price: {analysis['price']}\n📊 Signal: {analysis['signal']}"
             success = utils.send_telegram_notification(msg, analysis['signal'])
             
-            results.append({"symbol": clean_symbol, "sent": success})
+            results.append({
+                "symbol": clean_symbol, 
+                "sent": success, 
+                "price": analysis['price']
+            })
             
         except Exception as e:
-            print(f"🔥 Error: {str(e)}")
+            print(f"🔥 Error on {symbol}: {str(e)}")
+            results.append({"symbol": symbol, "error": str(e)})
             
-    return jsonify({"status": "Complete", "results": results, "checked": current_watchlist})
-
+    return jsonify({
+        "status": "Complete",
+        "results": results,
+        "debug_info": {
+            "env_watchlist_raw": os.getenv("WATCHLIST"),
+            "processed_list": current_watchlist
+        }
+    })
+    
 # ۶. شروع برنامه
 if __name__ == "__main__":
     # اجرای ترد زمان‌بندی
