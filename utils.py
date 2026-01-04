@@ -19,25 +19,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ==================== TELEGRAM NOTIFICATION ====================
-def send_telegram_notification(message: str, signal_type: str = "INFO", debug_mode: bool = False) -> bool:
-    """
-    ارسال سیگنال به کانال تلگرام با فرمت حرفه‌ای
-    با قابلیت عیب‌یابی پیشرفته و حالت دیباگ
-    """
+def send_telegram_notification(message, signal_type="INFO"):
+    """ارسال پیام با سیستم عیب‌یابی دقیق"""
+    token = config.TELEGRAM_BOT_TOKEN
+    chat_id = config.TELEGRAM_CHAT_ID
+    
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    
     try:
-        # حالت دیباگ: فقط لاگ می‌کند، ارسال نمی‌کند
-        if debug_mode:
-            logger.info(f"[DEBUG] Telegram Notification ({signal_type}): {message}")
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            print(f"✅ Telegram: Message sent to {chat_id}")
             return True
-            
-        # بررسی وجود تنظیمات
-        if not hasattr(config, 'TELEGRAM_BOT_TOKEN') or not config.TELEGRAM_BOT_TOKEN:
-            logger.error("Telegram Error: Bot token not configured")
+        else:
+            # این خط بسیار حیاتی است؛ دلیل شکست را در لاگ رندر چاپ می‌کند
+            print(f"❌ Telegram Error: Status {response.status_code}, Response: {response.text}")
             return False
-            
-        if not hasattr(config, 'TELEGRAM_CHAT_ID') or not config.TELEGRAM_CHAT_ID:
-            logger.error("Telegram Error: Chat ID not configured")
-            return False
+    except Exception as e:
+        print(f"🔥 Telegram Connection Failed: {e}")
+        return False
         
         # تنظیم ایموجی
         emoji_map = {
