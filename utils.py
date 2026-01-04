@@ -19,70 +19,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ==================== TELEGRAM NOTIFICATION ====================
-def send_telegram_notification(message, signal_type="INFO"):
-    # حذف هرگونه فاصله یا کاراکتر اضافی از ابتدا و انتهای توکن و آیدی
-    token = str(config.TELEGRAM_BOT_TOKEN).strip().replace(" ", "")
-    chat_id = str(config.TELEGRAM_CHAT_ID).strip().replace(" ", "")
-    
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
-    
+def send_telegram_notification(message, signal_type="INFO", exit_levels=None):
     try:
-        # لاگ برای دیباگ (اختیاری)
-        print(f"📡 Attempting to send message to {chat_id}...")
+        token = str(config.TELEGRAM_BOT_TOKEN).strip().replace(" ", "")
+        chat_id = str(config.TELEGRAM_CHAT_ID).strip().replace(" ", "")
         
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            print("✅ Telegram: Message sent successfully!")
-            return True
-        else:
-            print(f"❌ Telegram Error: {response.status_code} - {response.text}")
-            return False
-    except Exception as e:
-        print(f"🔥 Telegram Connection Exception: {e}")
-        return False
-        
-        # تنظیم ایموجی
         emoji_map = {
             "BUY": "🟢", "SELL": "🔴", "STRONG_BUY": "🚀", "STRONG_SELL": "🔻",
-            "ALERT": "⚠️", "INFO": "ℹ️", "ERROR": "❌", "TEST": "🧪",
-            "HOLD": "⏸️", "CLOSE": "📉", "SCALP": "⚡"
+            "TARGET": "🎯", "STOP": "🛑", "INFO": "ℹ️", "TEST": "🧪"
         }
-        
         emoji = emoji_map.get(signal_type, "📊")
-        timestamp = datetime.now().strftime("%H:%M:%S")
         
-        # فرمت پیام
-        if signal_type in ["BUY", "SELL", "STRONG_BUY", "STRONG_SELL", "TEST"]:
-            formatted_message = f"{emoji} *{signal_type}* [{timestamp}]\n{message}"
-        else:
-            formatted_message = f"{emoji} {signal_type} [{timestamp}]\n{message}"
+        # ساخت بدنه پیام
+        full_message = f"{emoji} *{signal_type}*\n{message}"
         
-        url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": config.TELEGRAM_CHAT_ID,
-            "text": formatted_message,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-        }
+        # اضافه کردن تارگت‌ها اگر وجود داشتند
+        if exit_levels:
+            full_message += (
+                f"\n\n🎯 *Targets:*\n"
+                f"🔹 Entry: {exit_levels['entry']:.4f}\n"
+                f"✅ TP1: {exit_levels['tp1']:.4f}\n"
+                f"✅ TP2: {exit_levels['tp2']:.4f}\n"
+                f"🛑 SL: {exit_levels['stop_loss']:.4f}"
+            )
+
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": full_message, "parse_mode": "Markdown"}
         
-        # ارسال درخواست
-        response = requests.post(url, json=payload, timeout=15)
-        
-        # عیب‌یابی دقیق
-        if response.status_code != 200:
-            error_data = response.json() if response.content else {}
-            error_msg = error_data.get('description', 'Unknown error')
-            logger.error(f"Telegram API Error (Status {response.status_code}): {error_msg}")
-            logger.error(f"Chat ID: {config.TELEGRAM_CHAT_ID}")
-            return False
-        else:
-            logger.info(f"Telegram notification sent successfully! (Type: {signal_type})")
-            return True
+        response = requests.post(url, json=payload, timeout=10)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Telegram Error: {e}")
+        return False
             
     except requests.exceptions.Timeout:
         logger.error("Telegram Error: Request timeout (15 seconds)")
