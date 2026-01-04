@@ -1,0 +1,9 @@
+python-dotenv
+flask
+pandas
+numpy
+requests
+schedule
+pytz
+yfinance
+ta
