@@ -9,6 +9,26 @@ import exchange_handler
 import utils
 import config
 
+@app.route('/force_analyze')
+def force_analyze():
+    """اجرای دستی تحلیل برای تمام ارزهای واچ‌لیست"""
+    now = get_iran_time()
+    results = []
+    
+    # اجرای تحلیل برای تک تک ارزها بدون توجه به ساعت
+    for symbol in WATCHLIST:
+        try:
+            analyze_and_broadcast(symbol)
+            results.append(f"Analyzed {symbol}")
+        except Exception as e:
+            results.append(f"Error {symbol}: {str(e)}")
+            
+    return jsonify({
+        "message": "Manual analysis triggered",
+        "time_iran": now.strftime('%H:%M:%S'),
+        "results": results
+    })
+    
 app = Flask(__name__)
 port = int(os.environ.get("PORT", 5000))
 
