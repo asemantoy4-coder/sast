@@ -126,11 +126,42 @@ def home():
 
 @app.route('/force_analyze')
 def force_analyze():
-    """اجرای دستی برای تست فوری"""
-    print("⚡ Manual Trigger received!")
-    for symbol in WATCHLIST:
-        analyze_and_broadcast(symbol)
-    return jsonify({"message": "Manual analysis triggered. Check Telegram and Logs."})
+    """تست دستی با لاگ‌گذاری کامل"""
+    print("⚡ Manual Trigger: Starting analysis...")
+    results = []
+    
+    # اطمینان از اینکه واچ‌لیست خالی نیست
+    test_watchlist = ['BTC/USDT', 'ETH/USDT'] 
+    
+    for symbol in test_watchlist:
+        try:
+            print(f"🔍 Checking {symbol}...")
+            # ۱. دریافت دیتا
+            df = exchange_handler.fetch_data(symbol, '5m', limit=100)
+            
+            if df is None or df.empty:
+                print(f"❌ No data for {symbol}")
+                continue
+                
+            # ۲. تحلیل با استفاده از utils (حالت تست فعال)
+            analysis = utils.generate_scalp_signals(df, test_mode=True)
+            
+            # ۳. ساخت پیام
+            msg = f"🧪 *TEST SIGNAL*\n🪙 Symbol: {symbol}\n💰 Price: {analysis['price']}\n📊 Signal: {analysis['signal']}"
+            
+            # ۴. ارسال به تلگرام
+            success = utils.send_telegram_notification(msg, analysis['signal'])
+            
+            results.append({"symbol": symbol, "sent": success, "signal": analysis['signal']})
+            
+        except Exception as e:
+            print(f"🔥 Error analyzing {symbol}: {str(e)}")
+            
+    return jsonify({
+        "status": "Analysis complete",
+        "results": results,
+        "time": datetime.now().strftime("%H:%M:%S")
+    })
 
 # ۶. شروع برنامه
 if __name__ == "__main__":
