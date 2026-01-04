@@ -125,51 +125,36 @@ def home():
     })
 @app.route('/force_analyze')
 def force_analyze():
-    """تست دستی - حالا با فراخوانی درست از کلاس DataHandler"""
-    print("⚡ Manual Trigger: Starting analysis...")
+    # اگر واچ‌لیست خالی بود، از لیست دستی استفاده کن
+    current_watchlist = config.WATCHLIST if config.WATCHLIST else ["ETH/USDT", "BTC/USDT"]
+    
+    print(f"⚡ Manual Trigger: Checking {current_watchlist}")
     results = []
     
-    # استفاده از واچ‌لیست اصلی برای تست
-    for symbol in WATCHLIST[:2]: # تست روی دو ارز اول
+    for symbol in current_watchlist[:3]: # بررسی ۳ ارز اول
         try:
-            print(f"🔍 Checking {symbol}...")
+            # پاک‌سازی نام سمبل برای اطمینان
+            clean_symbol = symbol.replace("/", "") 
+            print(f"🔍 Analyzing {clean_symbol}...")
             
-            # اصلاح اصلی: فراخوانی متد از داخل کلاس DataHandler
-            df = exchange_handler.DataHandler.fetch_data(symbol, '5m', limit=100)
+            df = exchange_handler.DataHandler.fetch_data(clean_symbol, '5m', limit=100)
             
             if df is None or df.empty:
-                print(f"❌ No data for {symbol}")
+                print(f"❌ No data for {clean_symbol}")
                 continue
                 
-            # تحلیل با حالت تست برای اجبار به تولید سیگنال
             analysis = utils.generate_scalp_signals(df, test_mode=True)
             
-            current_price = analysis['price']
-            side = analysis['signal']
+            # ارسال به تلگرام
+            msg = f"🧪 *TEST*\n🪙 Symbol: {clean_symbol}\n💰 Price: {analysis['price']}\n📊 Signal: {analysis['signal']}"
+            success = utils.send_telegram_notification(msg, analysis['signal'])
             
-            # محاسبه سطوح خروج برای نمایش در پیام
-            sl = current_price * 0.995 if side == "BUY" else current_price * 1.005
-            exits = utils.get_exit_levels(current_price, sl, direction=side)
-            
-            # ساخت بدنه پیام
-            msg = (
-                f"🧪 *TEST SIGNAL: {symbol}*\n"
-                f"📶 Side: {side}\n"
-                f"💵 Entry: {current_price:.4f}\n"
-                f"🎯 TP1: {exits['tp1']:.4f}\n"
-                f"🛑 SL: {sl:.4f}"
-            )
-            
-            # ارسال و ثبت نتیجه
-            success = utils.send_telegram_notification(msg, side)
-            results.append({"symbol": symbol, "sent": success, "signal": side})
+            results.append({"symbol": clean_symbol, "sent": success})
             
         except Exception as e:
             print(f"🔥 Error: {str(e)}")
-            results.append({"symbol": symbol, "error": str(e)})
             
-    return jsonify({"status": "Complete", "results": results})
-
+    return jsonify({"status": "Complete", "results": results, "checked": current_watchlist})
 
 # ۶. شروع برنامه
 if __name__ == "__main__":
