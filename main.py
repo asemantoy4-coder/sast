@@ -25,10 +25,11 @@ SYSTEM_START_TIME = datetime.now(pytz.timezone('Asia/Tehran'))
 class SystemConfig:
     CHECK_INTERVAL = 20  # ثانیه
     MIN_SCORE = 3  # حداقل امتیاز برای سیگنال
-    TRADING_HOURS = (10, 19)  # ساعت ۱۰ تا ۱۹
+    # تغییر از (10, 19) به (0, 23) برای فعالیت شبانه‌روزی
+    TRADING_HOURS = (0, 23)  
     MAX_HISTORY = 100  # حداکثر تاریخچه ذخیره‌شده
     RISK_FREE_ENABLED = True  # فعال‌سازی حالت ریسک‌فری
-
+    
 def get_iran_time() -> datetime:
     """محاسبه زمان فعلی تهران"""
     return datetime.now(pytz.timezone('Asia/Tehran'))
