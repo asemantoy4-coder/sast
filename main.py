@@ -628,6 +628,40 @@ def system_settings():
             })
         except Exception as e:
             return jsonify({"status": "error", "error": str(e)}), 400
+@app.route('/webhook', methods=['POST'])
+def tradingview_webhook():
+    """دریافت سیگنال مستقیم از تریدینگ‌ویو"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"status": "empty_data"}), 400
+        
+        # استخراج اطلاعات از JSON ارسالی تریدینگ‌ویو
+        symbol = data.get('symbol', 'Unknown')
+        side = data.get('side', 'N/A')
+        price = data.get('price', 0)
+        sl = data.get('sl', 0)
+        tp = data.get('tp', 0)
+
+        emoji = "🟢" if side == "BUY" else "🔴"
+        
+        msg = (
+            f"🚀 *NEW SIGNAL FROM TRADINGVIEW* {emoji}\n"
+            f"📊 Symbol: {symbol}\n"
+            f"📶 Direction: {side}\n"
+            f"💵 Entry: {price}\n"
+            f"🎯 Target: {tp}\n"
+            f"🛑 Stop Loss: {sl}\n"
+            f"⏰ Time: {get_iran_time().strftime('%H:%M:%S')}"
+        )
+        
+        utils.send_telegram_notification(msg, side)
+        print(f"✅ وب‌هوک تریدینگ‌ویو برای {symbol} پردازش و ارسال شد.")
+        return jsonify({"status": "success"}), 200
+        
+    except Exception as e:
+        print(f"❌ خطا در پردازش وب‌هوک: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ۷. شروع برنامه
 if __name__ == "__main__":
