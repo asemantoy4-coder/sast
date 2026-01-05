@@ -12,7 +12,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8066443971:AAFBvYtLTdQIrLe
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "@AsemanSignals")
 
 # --- تنظیمات واچ‌لیست (ارزهای مورد نظر برای تحلیل) ---
-WATCHLIST_STR = os.getenv("WATCHLIST","ETHUSDT,ENAUSDT,XRPUSDT,UNIUSDT,BTCUSDT")
+WATCHLIST_STR = os.getenv("WATCHLIST", "ETHUSDT,ENAUSDT,1INCHUSDT,UNIUSDT,PUMPUSDT,XAUUSD")
 WATCHLIST = [s.strip() for s in WATCHLIST_STR.split(",")]
 
 # --- تنظیمات استراتژی و فیلترها ---
