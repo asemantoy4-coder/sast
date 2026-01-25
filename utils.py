@@ -1,7 +1,3 @@
-# 📦 Utilities Module - ابزارهای کمکی کامل برای Fast Scalp Bot
-# 🚀 Version: 3.0.0 | با ایچیموکو پیشرفته و دو چیکو اسپن
-# 📅 Last Updated: 2024-01-25
-
 import os
 import sys
 import logging
