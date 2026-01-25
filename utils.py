@@ -748,7 +748,7 @@ def generate_scalp_signals(df: pd.DataFrame, test_mode: bool = False,
         reasons = []
         scoring_details = {}
         
-        # 2.1 امتیاز Volume Profile (0-5 امتیاز)
+        # 2.1 امتیاز Volume Profile
         vp_zone = volume_profile.get('current_zone')
         if vp_zone == "CHEAP":
             score += 5.0
@@ -775,7 +775,7 @@ def generate_scalp_signals(df: pd.DataFrame, test_mode: bool = False,
             reasons.append(f"نقطه کنترل حجمی متوسط (POC: {poc_strength:.1f}%)")
             scoring_details["poc_strength"] = 1.0
         
-        # 2.2 امتیاز Market Regime (0-8 امتیاز)
+        # 2.2 امتیاز Market Regime
         if market_regime.get('scalp_safe', False):
             score += 5.0
             reasons.append("بازار برای اسکالپ امن است")
@@ -799,7 +799,7 @@ def generate_scalp_signals(df: pd.DataFrame, test_mode: bool = False,
         score += regime_score
         scoring_details["regime_score"] = regime_score
         
-        # 2.3 امتیاز Ichimoku با دو چیکو (0-20 امتیاز)
+        # 2.3 امتیاز Ichimoku با دو چیکو
         ichimoku_signal = ichimoku.get('signal', 'HOLD')
         ichimoku_score = ichimoku.get('ichimoku_score', 0)
         dual_chikou_signal = ichimoku.get('dual_chikou_signal', 'NEUTRAL')
@@ -812,21 +812,19 @@ def generate_scalp_signals(df: pd.DataFrame, test_mode: bool = False,
         scoring_details["ichimoku_score"] = ichimoku_score
         scoring_details["dual_chikou_boost"] = dual_chikou_boost
         
-        # دلایل دو چیکو
-        chikou_reasons = dual_chikou_details.get('reasons', [])
-        for reason in chikou_reasons:
-            reasons.append(f"چیکو: {reason}")
-        
-        # امتیاز اضافی برای تطابق دو چیکو
-        if dual_chikou_signal != "NEUTRAL":
-            if dual_chikou_signal == "STRONG_BUY" or dual_chikou_signal == "STRONG_SELL":
-                reasons.append(f"✅ تأیید قوی دو چیکوی آینده ({dual_chikou_signal})")
-                scoring_details["dual_chikou_confirmation"] = 8.0
-                score += 8.0
-            elif dual_chikou_signal in ["WEAK_BUY", "WEAK_SELL"]:
-                reasons.append(f"⚠️ تأیید ضعیف دو چیکوی آینده ({dual_chikou_signal})")
-                scoring_details["dual_chikou_confirmation"] = 4.0
-                score += 4.0
+        # ادامه منطق امتیازدهی Ichimoku و Dual Chikou
+        if "BUY" in ichimoku_signal:
+            reasons.append(f"تاییدیه ایچیموکو: {ichimoku_signal}")
+            if dual_chikou_details.get('both_below'):
+                reasons.append("🚀 تاییدیه طلایی: هر دو چیکو زیر قیمت (سیگنال خرید قوی)")
+        elif "SELL" in ichimoku_signal:
+            reasons.append(f"تاییدیه ایچیموکو: {ichimoku_signal}")
+            if dual_chikou_details.get('both_above'):
+                reasons.append("🔻 تاییدیه طلایی: هر دو چیکو بالای قیمت (سیگنال فروش قوی)")
+
+        # اضافه کردن جزئیات دلایل چیکو به لیست دلایل نهایی
+        for r in dual_chikou_details.get('reasons', []):
+            reasons.append(f"Chikou: {r}")
         
         # اطلاعات اختلاف چیکوها
         chikou_26_diff = dual_chikou_details.get('chikou_26_diff', 0)
@@ -890,167 +888,78 @@ def generate_scalp_signals(df: pd.DataFrame, test_mode: bool = False,
                 reasons.append(f"تنکان زیر کیجون ({tenkan_kijun_diff:.2f}%)")
                 scoring_details["tenkan_kijun_cross"] = -5.0
         
-        # 3. نهایی کردن وضعیت سیگنال بر اساس امتیاز
+        # 3. نهایی کردن وضعیت سیگنال بر اساس امتیاز کل
+        # نرمال‌سازی امتیاز برای تصمیم‌گیری (مقیاس حدود -50 تا +50)
         final_signal = "NEUTRAL"
-        confidence = 0.0
         
-        # اولویت: سیگنال اجباری (اگر مشخص شده باشد)
-        if force_signal and force_signal.upper() in ["BUY", "SELL"]:
-            final_signal = force_signal.upper()
-            confidence = 0.8
-            reasons.append(f"سیگنال اجباری اعمال شد: {final_signal}")
-            logger.info(f"Force signal applied: {final_signal}")
-        
-        # حالت تست
-        elif test_mode:
-            if score >= 0:
-                final_signal = "BUY"
-                reasons.append("🔬 حالت تست فعال - سیگنال خرید")
-            else:
-                final_signal = "SELL"
-                reasons.append("🔬 حالت تست فعال - سیگنال فروش")
-            confidence = min(abs(score) / 100 + 0.3, 0.8)
-        
-        # حالت عادی
-        else:
-            # محاسبه امتیاز نرمال‌شده (0-100)
-            normalized_score = min(max(score, -100), 100)
-            
-            # حد نصاب 65 برای ورود قوی
-            if score >= 65:  # حد نصاب ورود قوی
-                if "STRONG" in ichimoku_signal or "STRONG" in dual_chikou_signal:
-                    final_signal = "STRONG_BUY"
-                else:
-                    final_signal = "BUY"
-                confidence = min(normalized_score / 100, 0.95)
-                reasons.append(f"💪 سیگنال خرید قوی (امتیاز: {score:.1f})")
-            elif score >= 40:  # حد نصاب ورود ضعیف
-                final_signal = "WEAK_BUY"
-                confidence = min(normalized_score / 100 * 0.7, 0.8)
-                reasons.append(f"⚠️ سیگنال خرید ضعیف (امتیاز: {score:.1f})")
-            elif score <= -65:  # حد نصاب فروش قوی
-                if "STRONG" in ichimoku_signal or "STRONG" in dual_chikou_signal:
-                    final_signal = "STRONG_SELL"
-                else:
-                    final_signal = "SELL"
-                confidence = min(abs(normalized_score) / 100, 0.95)
-                reasons.append(f"💪 سیگنال فروش قوی (امتیاز: {score:.1f})")
-            elif score <= -40:  # حد نصاب فروش ضعیف
-                final_signal = "WEAK_SELL"
-                confidence = min(abs(normalized_score) / 100 * 0.7, 0.8)
-                reasons.append(f"⚠️ سیگنال فروش ضعیف (امتیاز: {score:.1f})")
-            else:
-                final_signal = "NEUTRAL"
-                confidence = 0.3
-                reasons.append(f"⏸️ سیگنال مشخصی نیست (امتیاز: {score:.1f})")
-        
+        # حد نصاب برای ورود به معامله (قابل تنظیم)
+        buy_threshold = 12.0
+        sell_threshold = -12.0
+
+        if score >= buy_threshold:
+            final_signal = "STRONG_BUY" if score > 18.0 else "BUY"
+        elif score <= sell_threshold:
+            final_signal = "STRONG_SELL" if score < -18.0 else "SELL"
+
+        # اجبار به تولید سیگنال در حالت تست (Force Signal)
+        if force_signal:
+            final_signal = force_signal
+            score = 25.0 if "BUY" in force_signal else -25.0
+
         # 4. محاسبه سطوح خروج (TP/SL) در صورت وجود سیگنال
         exit_levels = None
-        if final_signal not in ["NEUTRAL", "WEAK_BUY", "WEAK_SELL"]:
+        if final_signal != "NEUTRAL":
             # تعیین حد ضرر بر اساس کیجون یا کف/سقف اخیر
-            kijun = ichimoku.get('kijun', current_price)
+            sl_price = ichimoku.get('kijun', current_price * 0.99)
             
-            if "BUY" in final_signal:
-                # برای خرید: حد ضرر زیر کیجون
-                stop_loss = kijun
-                # اگر قیمت خیلی به کیجون نزدیک بود، از ATR استفاده کن
-                atr_value = (atr_percent / 100) * current_price
-                if abs(current_price - stop_loss) < atr_value:
-                    stop_loss = current_price - (atr_value * 1.5)
-            else:
-                # برای فروش: حد ضرر بالای کیجون
-                stop_loss = kijun
-                atr_value = (atr_percent / 100) * current_price
-                if abs(current_price - stop_loss) < atr_value:
-                    stop_loss = current_price + (atr_value * 1.5)
-            
+            # جلوگیری از SL خیلی نزدیک (حداقل فاصله بر اساس ATR)
+            min_dist = current_price * (market_regime.get('atr_percent', 0.5) / 100)
+            if abs(current_price - sl_price) < min_dist:
+                sl_price = current_price - min_dist if "BUY" in final_signal else current_price + min_dist
+
             exit_levels = get_exit_levels(
                 price=current_price,
-                stop_loss=stop_loss,
+                stop_loss=sl_price,
                 direction="BUY" if "BUY" in final_signal else "SELL",
                 scalping_mode=True,
-                volatility_pct=atr_percent
+                volatility_pct=market_regime.get('atr_percent', 1.0)
             )
-        
-        # 5. جمع‌بندی نهایی
-        result = {
+
+        return {
             "valid": True,
-            "price": float(current_price),
             "score": round(score, 2),
             "signal": final_signal,
-            "confidence": float(confidence),
             "reasons": reasons,
-            "timestamp": datetime.now().isoformat(),
-            "test_mode": test_mode,
-            "force_signal": force_signal,
-            "scoring_details": scoring_details,
             "exit_levels": exit_levels,
             "analysis": {
                 "ichimoku": ichimoku,
                 "volume": volume_profile,
                 "regime": market_regime,
                 "scoring_details": scoring_details
-            },
-            "dual_chikou_analysis": {
-                "signal": dual_chikou_signal,
-                "boost": dual_chikou_boost,
-                "confidence": ichimoku.get('dual_chikou_confidence', 0.0),
-                "details": dual_chikou_details
             }
         }
-        
-        # لاگ اطلاعاتی
-        logger.info(f"Signal Generated: {final_signal} (Score: {score:.1f}, Confidence: {confidence:.1%})")
-        
-        return result
-        
+
     except Exception as e:
-        error_msg = f"Signal Generation Error: {type(e).__name__}: {str(e)}"
-        logger.error(error_msg)
-        return {
-            "valid": False, 
-            "score": 0, 
-            "signal": "ERROR", 
-            "reasons": [error_msg], 
-            "analysis": {}
-        }
+        logger.error(f"Error in signal generation: {str(e)}")
+        return {"valid": False, "score": 0, "signal": "ERROR", "reasons": [str(e)]}
 
 # ==================== DATAFRAME VALIDATOR ====================
 def validate_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
-    """
-    اعتبارسنجی DataFrame ورودی برای تحلیل دو چیکوی آینده
-    """
+    """بررسی صحت و کامل بودن دیتای ورودی"""
     errors = []
-    
     if df is None or df.empty:
-        return {"valid": False, "errors": ["Dataframe is empty"]}
+        return {"valid": False, "errors": ["دیتایی یافت نشد"]}
     
-    # بررسی ستون‌های ضروری
-    required_columns = ['Open', 'High', 'Low', 'Close']
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    
-    if missing_columns:
-        errors.append(f"Missing required columns: {missing_columns}")
-    
-    # بررسی حداقل داده (نیاز به 78 کندل برای چیکوی 78)
-    if len(df) < 78:
-        errors.append(f"Insufficient data: Need minimum 78 candles for dual chikou analysis, got {len(df)}")
-    
-    # بررسی مقادیر NaN
-    if df.isnull().values.any():
-        errors.append("DataFrame contains NaN values")
-    
-    # بررسی مقادیر غیرعادی
+    required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
     for col in required_columns:
-        if col in df.columns:
-            if df[col].min() <= 0:
-                errors.append(f"Column {col} contains non-positive values")
+        if col not in df.columns:
+            errors.append(f"ستون {col} در دیتا وجود ندارد")
     
-    return {
-        "valid": len(errors) == 0,
-        "errors": errors,
-        "row_count": len(df)
-    }
+    # برای محاسبات Dual Chikou (78 کندل) و SMA50، حداقل 80 کندل نیاز داریم
+    if len(df) < 80:
+        errors.append(f"تعداد کندل ناکافی: نیاز به 80، موجود {len(df)}")
+        
+    return {"valid": len(errors) == 0, "errors": errors}
 
 # ==================== HELPER FUNCTIONS ====================
 def format_price(price: float) -> str:
@@ -1151,8 +1060,7 @@ def format_signal_message(symbol: str, signal_data: Dict[str, Any]) -> str:
             f"{emoji} *{signal}*",
             f"`{symbol}`",
             f"💰 قیمت: {format_price(price)}",
-            f"📊 امتیاز: {score:.1f}",
-            f"🎯 اعتماد: {confidence:.0%}"
+            f"📊 امتیاز: {score:.1f}"
         ]
         
         if chikou_boost > 1.0:
